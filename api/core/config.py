@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Google OAuth
     google_client_id: str = ""
     google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/auth/google/callback"
+    google_redirect_uri: str = "${{RAILWAY_PUBLIC_DOMAIN}}/auth/google/callback"
 
     # Session cookie
     session_secret: str = "dev-secret-change-me"
