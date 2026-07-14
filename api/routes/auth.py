@@ -56,7 +56,11 @@ async def callback(code: str, db: AsyncSession = Depends(get_db)) -> RedirectRes
 
     settings = get_settings()
     session_token = create_session_token(str(user.id))
-    response = RedirectResponse(settings.frontend_origin)
+    # Browsers now block cross-site cookies outright, so hand the token to the
+    # SPA via a redirect query param; it stores it and sends it back as a
+    # Bearer header. The cookie is also set for local dev, where the frontend
+    # and API share localhost and a cookie works fine without any of this.
+    response = RedirectResponse(f"{settings.frontend_origin}/?token={session_token}")
     is_cross_site = settings.frontend_origin.startswith("https://")
     response.set_cookie(
         SESSION_COOKIE_NAME,
