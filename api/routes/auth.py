@@ -11,6 +11,7 @@ from core.db import get_db
 from core.deps import get_current_user
 from core.google_oauth import build_auth_url, exchange_code_for_tokens, verify_id_token
 from core.models import User
+from core.ratelimit import rate_limit_by_ip
 from core.session import SESSION_COOKIE_NAME, SESSION_TTL, create_session_token
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
@@ -23,13 +24,19 @@ async def me(user: User = Depends(get_current_user)) -> dict:
 
 
 @router.get("/login")
-async def login() -> RedirectResponse:
+async def login(
+    _rate_limit: None = Depends(rate_limit_by_ip("google_login", limit=20, window_seconds=300)),
+) -> RedirectResponse:
     state = secrets.token_urlsafe(16)
     return RedirectResponse(build_auth_url(state))
 
 
 @router.get("/callback")
-async def callback(code: str, db: AsyncSession = Depends(get_db)) -> RedirectResponse:
+async def callback(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit_by_ip("google_callback", limit=20, window_seconds=300)),
+) -> RedirectResponse:
     tokens = await exchange_code_for_tokens(code)
     if "refresh_token" not in tokens:
         raise HTTPException(

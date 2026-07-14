@@ -8,13 +8,17 @@ from core.db import async_session_factory
 from core.deps import get_current_user
 from core.models import Bucket, Thread, User
 from core.queue import queue
+from core.ratelimit import rate_limit
 from gmail.sync import sync_last_200_threads
 
 router = APIRouter(tags=["sync"])
 
 
 @router.post("/sync", status_code=202)
-async def start_sync(user: User = Depends(get_current_user)) -> dict:
+async def start_sync(
+    user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(rate_limit("sync", limit=5, window_seconds=300)),
+) -> dict:
     user_id: uuid.UUID = user.id
 
     async def run() -> dict:
