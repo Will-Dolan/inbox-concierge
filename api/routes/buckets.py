@@ -216,7 +216,7 @@ async def update_bucket(
                     "evaluated": result["threads"],
                 }
 
-        job_id = queue.enqueue(run)
+        job_id = queue.enqueue(run, user_id)
         return {
             "id": str(bucket.id),
             "mode": bucket.mode,
@@ -271,7 +271,7 @@ async def create_bucket(
     bucket_id = bucket.id
     user_id = user.id
     classifier = body.classifier
-    job_id = queue.reserve()
+    job_id = queue.reserve(user_id)
 
     async def run() -> dict:
         async with async_session_factory() as session:

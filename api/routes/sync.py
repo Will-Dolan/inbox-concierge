@@ -39,13 +39,13 @@ async def start_sync(
             classified = await classify_new_threads(session, list(threads), list(default_buckets))
             return {"threads_synced": synced, "threads_classified": classified}
 
-    job_id = queue.enqueue(run)
+    job_id = queue.enqueue(run, user_id)
     return {"job_id": job_id}
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str) -> dict:
+async def get_job(job_id: str, user: User = Depends(get_current_user)) -> dict:
     job = queue.get(job_id)
-    if job is None:
+    if job is None or job.user_id != user.id:
         return {"status": "not_found"}
     return {"status": job.status, "result": job.result, "error": job.error, "progress": job.progress}
