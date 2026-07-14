@@ -42,7 +42,9 @@ def _parse_unsubscribe(headers: dict) -> dict | None:
     return None
 
 
-async def list_candidates(db: AsyncSession, user_id: uuid.UUID, bucket_id: uuid.UUID) -> list[dict]:
+async def _candidates_by_domain(
+    db: AsyncSession, user_id: uuid.UUID, bucket_id: uuid.UUID
+) -> dict[str, dict]:
     result = await db.execute(
         select(Thread)
         .join(ThreadTag, ThreadTag.thread_id == Thread.id)
@@ -71,7 +73,28 @@ async def list_candidates(db: AsyncSession, user_id: uuid.UUID, bucket_id: uuid.
         else:
             entry["thread_count"] += 1
 
+    return by_domain
+
+
+async def list_candidates(db: AsyncSession, user_id: uuid.UUID, bucket_id: uuid.UUID) -> list[dict]:
+    by_domain = await _candidates_by_domain(db, user_id, bucket_id)
     return sorted(by_domain.values(), key=lambda e: e["thread_count"], reverse=True)
+
+
+async def get_one_click_url(
+    db: AsyncSession, user_id: uuid.UUID, bucket_id: uuid.UUID, sender_domain: str
+) -> str | None:
+    """Re-derive the one-click unsubscribe URL for a user's own thread data.
+
+    Never trust a client-supplied URL for the actual outbound POST - always
+    recompute it server-side from this user's bucket/thread headers so the
+    server can only ever hit a target it derived itself (SSRF prevention).
+    """
+    by_domain = await _candidates_by_domain(db, user_id, bucket_id)
+    entry = by_domain.get(sender_domain)
+    if entry is None or entry.get("method") != "one_click":
+        return None
+    return entry["url"]
 
 
 async def execute_one_click(url: str) -> bool:

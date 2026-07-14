@@ -104,10 +104,10 @@ export const api = {
 
   getUnsubscribeCandidates: (bucketId: string) =>
     request<UnsubscribeCandidate[]>(`/unsubscribe/candidates?bucket_id=${bucketId}`),
-  executeUnsubscribe: (url: string) =>
+  executeUnsubscribe: (bucketId: string, senderDomain: string) =>
     request<{ ok: boolean }>("/unsubscribe/execute", {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ bucket_id: bucketId, sender_domain: senderDomain }),
     }),
 
   startSync: () => request<{ job_id: string }>("/sync", { method: "POST" }),
