@@ -38,7 +38,7 @@ export function UnsubscribeSection({ bucketId, onMarkedRead }: Props) {
   async function runOneClick(c: UnsubscribeCandidate) {
     setStatus((s) => ({ ...s, [c.sender_domain]: "loading" }));
     try {
-      await api.executeUnsubscribe(c.url);
+      await api.executeUnsubscribe(bucketId, c.sender_domain);
       setStatus((s) => ({ ...s, [c.sender_domain]: "done" }));
     } catch {
       setStatus((s) => ({ ...s, [c.sender_domain]: "error" }));
