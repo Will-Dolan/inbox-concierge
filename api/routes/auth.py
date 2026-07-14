@@ -62,7 +62,7 @@ async def callback(code: str, db: AsyncSession = Depends(get_db)) -> RedirectRes
         session_token,
         httponly=True,
         secure=settings.env != "local",
-        samesite="lax",
+        samesite="none" if settings.env != "local" else "lax",
         max_age=int(SESSION_TTL.total_seconds()),
     )
     return response
