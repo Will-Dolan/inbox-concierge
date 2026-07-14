@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError, setToken } from "./api";
 import { Login } from "./components/Login";
 import { InboxView } from "./components/InboxView";
 
@@ -9,6 +9,14 @@ export default function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
 
   useEffect(() => {
+    const url = new URL(window.location.href);
+    const token = url.searchParams.get("token");
+    if (token) {
+      setToken(token);
+      url.searchParams.delete("token");
+      window.history.replaceState({}, "", url.toString());
+    }
+
     api
       .me()
       .then((me) => setAuth({ status: "signed-in", email: me.email }))
