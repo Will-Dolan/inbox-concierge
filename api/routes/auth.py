@@ -57,12 +57,13 @@ async def callback(code: str, db: AsyncSession = Depends(get_db)) -> RedirectRes
     settings = get_settings()
     session_token = create_session_token(str(user.id))
     response = RedirectResponse(settings.frontend_origin)
+    is_cross_site = settings.frontend_origin.startswith("https://")
     response.set_cookie(
         SESSION_COOKIE_NAME,
         session_token,
         httponly=True,
-        secure=settings.env != "local",
-        samesite="none" if settings.env != "local" else "lax",
+        secure=is_cross_site,
+        samesite="none" if is_cross_site else "lax",
         max_age=int(SESSION_TTL.total_seconds()),
     )
     return response
