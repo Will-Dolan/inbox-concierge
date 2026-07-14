@@ -8,13 +8,17 @@ from core.db import async_session_factory
 from core.deps import get_current_user
 from core.models import Bucket, Thread, User
 from core.queue import queue
+from core.ratelimit import rate_limit
 from gmail.sync import sync_last_200_threads
 
 router = APIRouter(tags=["sync"])
 
 
 @router.post("/sync", status_code=202)
-async def start_sync(user: User = Depends(get_current_user)) -> dict:
+async def start_sync(
+    user: User = Depends(get_current_user),
+    _rate_limit: None = Depends(rate_limit("sync", limit=5, window_seconds=300)),
+) -> dict:
     user_id: uuid.UUID = user.id
 
     async def run() -> dict:
@@ -35,13 +39,13 @@ async def start_sync(user: User = Depends(get_current_user)) -> dict:
             classified = await classify_new_threads(session, list(threads), list(default_buckets))
             return {"threads_synced": synced, "threads_classified": classified}
 
-    job_id = queue.enqueue(run)
+    job_id = queue.enqueue(run, user_id)
     return {"job_id": job_id}
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str) -> dict:
+async def get_job(job_id: str, user: User = Depends(get_current_user)) -> dict:
     job = queue.get(job_id)
-    if job is None:
+    if job is None or job.user_id != user.id:
         return {"status": "not_found"}
     return {"status": job.status, "result": job.result, "error": job.error, "progress": job.progress}

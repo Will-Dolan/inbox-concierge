@@ -11,6 +11,7 @@ from core.db import get_db
 from core.deps import get_current_user
 from core.google_oauth import build_auth_url, exchange_code_for_tokens, verify_id_token
 from core.models import User
+from core.ratelimit import rate_limit_by_ip
 from core.session import SESSION_COOKIE_NAME, SESSION_TTL, create_session_token
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
@@ -26,7 +27,9 @@ async def me(user: User = Depends(get_current_user)) -> dict:
 
 
 @router.get("/login")
-async def login() -> RedirectResponse:
+async def login(
+    _rate_limit: None = Depends(rate_limit_by_ip("google_login", limit=20, window_seconds=300)),
+) -> RedirectResponse:
     settings = get_settings()
     state = secrets.token_urlsafe(16)
     response = RedirectResponse(build_auth_url(state))
@@ -47,6 +50,7 @@ async def callback(
     state: str,
     db: AsyncSession = Depends(get_db),
     oauth_state: str | None = Cookie(default=None, alias=OAUTH_STATE_COOKIE_NAME),
+    _rate_limit: None = Depends(rate_limit_by_ip("google_callback", limit=20, window_seconds=300)),
 ) -> RedirectResponse:
     if oauth_state is None or not secrets.compare_digest(oauth_state, state):
         # Attach a Set-Cookie header (via a throwaway Response) so the
@@ -81,7 +85,11 @@ async def callback(
 
     settings = get_settings()
     session_token = create_session_token(str(user.id))
-    response = RedirectResponse(settings.frontend_origin)
+    # Browsers now block cross-site cookies outright, so hand the token to the
+    # SPA via a redirect query param; it stores it and sends it back as a
+    # Bearer header. The cookie is also set for local dev, where the frontend
+    # and API share localhost and a cookie works fine without any of this.
+    response = RedirectResponse(f"{settings.frontend_origin}/?token={session_token}")
     is_cross_site = settings.frontend_origin.startswith("https://")
     response.set_cookie(
         SESSION_COOKIE_NAME,

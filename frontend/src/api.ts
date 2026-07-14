@@ -14,6 +14,24 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
+const TOKEN_STORAGE_KEY = "session_token";
+
+// Cookies don't survive across the frontend/API's separate production
+// domains (browsers block third-party cookies), so the session token is
+// carried explicitly as a Bearer header instead. `credentials: "include"`
+// is kept too, so local dev (same-site cookie) keeps working unchanged.
+function getToken(): string | null {
+  return localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+function setToken(token: string): void {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+function clearToken(): void {
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
 class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -23,10 +41,15 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.text();
@@ -36,12 +59,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export { ApiError, API_BASE };
+export { ApiError, API_BASE, clearToken, setToken };
 
 export const api = {
   me: () => request<{ id: string; email: string }>("/auth/me"),
   loginUrl: () => `${API_BASE}/auth/google/login`,
-  logout: () => request<void>("/auth/google/logout", { method: "POST" }),
+  logout: () => request<void>("/auth/google/logout", { method: "POST" }).finally(clearToken),
 
   listThreads: (bucket?: string) =>
     request<Thread[]>(`/threads${bucket ? `?bucket=${encodeURIComponent(bucket)}` : ""}`),
@@ -81,10 +104,10 @@ export const api = {
 
   getUnsubscribeCandidates: (bucketId: string) =>
     request<UnsubscribeCandidate[]>(`/unsubscribe/candidates?bucket_id=${bucketId}`),
-  executeUnsubscribe: (url: string) =>
+  executeUnsubscribe: (bucketId: string, senderDomain: string) =>
     request<{ ok: boolean }>("/unsubscribe/execute", {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ bucket_id: bucketId, sender_domain: senderDomain }),
     }),
 
   startSync: () => request<{ job_id: string }>("/sync", { method: "POST" }),

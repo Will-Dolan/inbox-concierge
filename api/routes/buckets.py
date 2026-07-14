@@ -13,6 +13,7 @@ from core.deps import get_current_user
 from core.dsl import RuleDSL, describe_rule, normalize_conditions
 from core.models import Bucket, Rule, Thread, User
 from core.queue import queue
+from core.ratelimit import rate_limit
 
 router = APIRouter(tags=["buckets"])
 
@@ -167,6 +168,7 @@ async def update_bucket(
     body: UpdateBucketRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit("update_bucket", limit=30, window_seconds=300)),
 ) -> dict:
     bucket = await db.get(Bucket, bucket_id)
     if bucket is None or (bucket.user_id is not None and bucket.user_id != user.id):
@@ -214,7 +216,7 @@ async def update_bucket(
                     "evaluated": result["threads"],
                 }
 
-        job_id = queue.enqueue(run)
+        job_id = queue.enqueue(run, user_id)
         return {
             "id": str(bucket.id),
             "mode": bucket.mode,
@@ -245,6 +247,7 @@ async def create_bucket(
     body: CreateBucketRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit("create_bucket", limit=10, window_seconds=300)),
 ) -> dict:
     name = body.name.strip()
     if not name:
@@ -268,7 +271,7 @@ async def create_bucket(
     bucket_id = bucket.id
     user_id = user.id
     classifier = body.classifier
-    job_id = queue.reserve()
+    job_id = queue.reserve(user_id)
 
     async def run() -> dict:
         async with async_session_factory() as session:

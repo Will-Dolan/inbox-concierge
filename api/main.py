@@ -31,7 +31,11 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(auth.me_router)
 app.include_router(sync.router)
-app.include_router(debug.router)
+if settings.env == "local":
+    # /debug/threads dumps a user's full thread feature set. It's properly
+    # scoped to the caller's own data, but it's unnecessary attack surface
+    # outside local development, so only register it there.
+    app.include_router(debug.router)
 app.include_router(threads.router)
 app.include_router(buckets.router)
 app.include_router(corrections.router)
