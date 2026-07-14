@@ -1,5 +1,8 @@
+import os
 from functools import lru_cache
+from urllib.parse import urlparse, urlunparse
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +12,26 @@ class Settings(BaseSettings):
     # Postgres (async app runtime + sync alembic migrations)
     database_url: str = "postgresql+asyncpg://inbox:inbox@localhost:5432/inbox_concierge"
     database_url_sync: str = "postgresql+psycopg2://inbox:inbox@localhost:5432/inbox_concierge"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def ensure_async_driver(cls, v: str) -> str:
+        """Railway's Postgres plugin injects DATABASE_URL as
+        'postgresql://...', which defaults SQLAlchemy to the sync
+        psycopg2 driver. The async engine requires 'postgresql+asyncpg://',
+        so rewrite the scheme when DATABASE_URL is provided by the
+        environment, while leaving the local dev default untouched.
+        """
+        raw = os.environ.get("DATABASE_URL")
+        if not raw:
+            return v
+
+        parsed = urlparse(raw)
+        if parsed.scheme == "postgresql":
+            parsed = parsed._replace(scheme="postgresql+asyncpg")
+            return urlunparse(parsed)
+
+        return raw
 
     # Google OAuth
     google_client_id: str = ""
