@@ -74,6 +74,23 @@ flowchart TB
 - The DB is Postgres, accessed exclusively through async SQLAlchemy (`core/db.py`),
   migrated with Alembic (`api/migrations/versions/*`).
 
+## Known console noise (not bugs)
+
+Opening a thread renders the real email HTML in a sandboxed iframe
+(`EmailBody.tsx`), sanitized server-side but otherwise unmodified. Two DevTools
+messages are expected there and don't indicate an app bug:
+
+- `Blocked script execution in 'about:srcdoc'...` — the iframe's `sandbox`
+  attribute intentionally omits `allow-scripts`, so any script an email
+  attempts to run gets blocked. This is the sandbox working as intended;
+  adding `allow-scripts` to silence it would open an XSS hole (arbitrary
+  sender-controlled JS running in the app). Emitted by the browser's security
+  layer directly to DevTools — not something app code can catch or suppress.
+- `net::ERR_BLOCKED_BY_CLIENT` on third-party URLs (e.g. marketing tracking
+  pixels/redirect links embedded in the email body) — the user's own ad
+  blocker refusing those requests at the network layer. Not a `fetch()` call
+  our code makes, and not observable via `window.onerror` or any JS handler.
+
 ## Local deployment
 
 `docker-compose.yml` runs Postgres + the FastAPI app; the frontend is a separate Vite dev

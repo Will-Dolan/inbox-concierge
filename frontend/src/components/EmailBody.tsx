@@ -33,6 +33,8 @@ export function EmailBody({ html }: Props) {
       title="Email content"
       srcDoc={srcDoc}
       onLoad={handleLoad}
+      // Deliberately no allow-scripts — see docs/architecture.md "Known
+      // console noise" for the script-block/tracking-pixel warnings this causes.
       sandbox="allow-same-origin allow-popups"
       style={{ height }}
       className="w-full border-0"
