@@ -1,3 +1,13 @@
+# Local-development-only configuration.
+#
+# The Postgres credentials below (inbox/inbox) and the published 5432 port
+# match the defaults in api/core/config.py and are intentionally weak/open
+# for developer convenience (see Makefile's `make dev` / README "Run locally").
+# They must never be reused as-is for any shared, staging, or production
+# deployment. Per docs/architecture.md's "Local deployment" section, the
+# intended cloud target is a managed Postgres (RDS) with credentials sourced
+# from environment-specific compose overrides or a secrets manager, not this
+# file.
 services:
   postgres:
     image: postgres:16-alpine
